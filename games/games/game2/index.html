@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クールなローグライクHTML v6 (Final Comments)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1c2c;
+            --main-text-color: #a9b1d6;
+            --panel-bg-start: #2a2f41;
+            --panel-bg-end: #24283b;
+            --border-color: #414868;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            --player-color: #73daca;
+            --enemy-color: #f7768e;
+            --item-color: #e0af68;
+            --stairs-color: #bb9af7;
+            --wall-color: #565f89;
+            --floor-color: #9abdf5;
+            --explored-color: #414868;
+            --trap-color: #ff9e64;
+            --hp-bar-color-start: #b9f27c;
+            --hp-bar-color-end: #9ece6a;
+            --hp-bar-bg-color: #565f89;
+            --hp-damage-flash-color: #f7768e;
+            --msg-damage-color: #f7768e;
+            --msg-heal-color: #9ece6a;
+            --msg-levelup-color: #bb9af7;
+            --msg-pickup-color: #73daca;
+            --msg-game-over-color: #db4b4b;
+        }
+        body { font-family: 'Fira Code', 'Courier New', Courier, monospace; background-color: var(--bg-color); color: var(--main-text-color); display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        h1 { color: var(--player-color); font-weight: 700; text-shadow: 0 0 5px var(--player-color), 0 0 10px var(--player-color), 0 0 15px rgba(115, 218, 202, 0.5); }
+        #game-container, #key-info { transition: opacity 0.5s ease-out; }
+        #game-container { display: flex; flex-direction: row; gap: 20px; margin-bottom: 20px; }
+        #map-container { border: 1px solid var(--border-color); padding: 10px; background-color: var(--panel-bg-end); border-radius: 8px; box-shadow: 0 5px 20px var(--shadow-color); }
+        #gameMap { white-space: pre; font-size: 20px; line-height: 1.0; letter-spacing: 0; background-color: #000; border-radius: 4px; }
+        .tile-wall { color: var(--wall-color); }
+        .tile-floor { color: var(--floor-color); }
+        .tile-stairs { color: var(--stairs-color); font-weight: bold; }
+        .tile-player { color: var(--player-color); font-weight: bold; }
+        .tile-enemy { color: var(--enemy-color); font-weight: bold; }
+        .tile-enemy-orc { color: orange; font-weight: bold; }
+        .tile-enemy-troll { color: darkred; font-weight: bold; }
+        .tile-enemy-bat { color: violet; font-weight: bold; }
+        .tile-enemy-dragon { color: #ff5555; font-weight: bold; animation: pulse 1s infinite; }
+        .tile-item { color: var(--item-color); font-weight: bold; }
+        .tile-trap { color: var(--trap-color); font-weight: bold; }
+        .tile-explored { color: var(--explored-color); opacity: 0.4; }
+        .tile-explored.tile-stairs, .tile-explored.tile-trap { opacity: 0.7; }
+        .tile-unseen { color: transparent; }
+        .entity-flash { animation: flash 0.3s 1; }
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); text-shadow: 0 0 5px transparent; } 50% { transform: scale(1.2); text-shadow: 0 0 10px #ff5555; } }
+        #ui-panel { width: 400px; display: flex; flex-direction: column; gap: 15px; }
+        #stats, #messages-container, #key-info { border: 1px solid var(--border-color); padding: 15px; background: linear-gradient(145deg, var(--panel-bg-start), var(--panel-bg-end)); border-radius: 8px; box-shadow: 0 5px 20px var(--shadow-color); }
+        h3 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 10px; color: var(--main-text-color); }
+        .hp-bar-container { width: 100%; height: 12px; background-color: var(--hp-bar-bg-color); border-radius: 6px; margin: 5px 0 10px; overflow: hidden; }
+        .hp-bar { height: 100%; background: linear-gradient(90deg, var(--hp-bar-color-start), var(--hp-bar-color-end)); border-radius: 6px; transition: width 0.3s ease-out; }
+        .hp-bar.damage-flash { animation: damage-flash 0.4s 1; }
+        @keyframes damage-flash { 0%, 100% { background-color: var(--hp-bar-color-end); } 50% { background-color: var(--hp-damage-flash-color); } }
+        #messages { height: 220px; overflow-y: auto; font-size: 0.9em; }
+        #messages p { margin: 0 0 5px 0; animation: slide-in 0.3s ease-out; }
+        @keyframes slide-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .msg-damage { color: var(--msg-damage-color); }
+        .msg-heal { color: var(--msg-heal-color); }
+        .msg-levelup { color: var(--msg-levelup-color); font-weight: bold; }
+        .msg-pickup { color: var(--msg-pickup-color); }
+        .msg-trap { color: var(--trap-color); }
+        .msg-game-over { color: var(--msg-game-over-color); font-weight: bold; font-size: 1.1em; }
+        .msg-win { color: var(--player-color); font-weight: bold; font-size: 1.1em; }
+        #key-info { margin-top: 20px; width: calc(50ch * 1.1 + 20px + 400px); max-width: 95%; box-sizing: border-box; }
+        #key-info h4 { margin-top: 0; margin-bottom: 5px; }
+        #key-info p { margin: 2px 0; font-size: 0.9em; }
+        #ending-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(26, 28, 44, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: opacity 1s ease-in-out, visibility 1s; z-index: 100; }
+        #ending-screen.visible { opacity: 1; visibility: visible; }
+        #ending-screen h2 { font-size: 3em; color: var(--player-color); text-shadow: 0 0 15px var(--player-color); animation: fade-in-text 2s ease-out forwards; opacity: 0; }
+        #ending-screen p { font-size: 1.2em; margin-top: 0; color: var(--main-text-color); animation: fade-in-text 2s 1s ease-out forwards; opacity: 0; }
+        #restart-button { margin-top: 40px; padding: 15px 30px; font-size: 1.2em; font-family: 'Fira Code', monospace; background-color: var(--player-color); color: var(--bg-color); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: transform 0.2s, box-shadow 0.2s; animation: fade-in-text 2s 2s ease-out forwards; opacity: 0; }
+        #restart-button:hover { transform: scale(1.05); box-shadow: 0 0 20px var(--player-color); }
+        @keyframes fade-in-text { to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <h1>クールなローグライクHTML</h1>
+    <div id="game-container">
+        <div id="map-container"><div id="gameMap"></div></div>
+        <div id="ui-panel">
+            <div id="stats">
+                <h3>ステータス</h3>
+                <p>フロア: <span id="stat-floor">1</span></p>
+                <p>HP: <span id="stat-hp">30</span> / <span id="stat-maxhp">30</span></p>
+                <div class="hp-bar-container"><div id="hp-bar" style="width: 100%;"></div></div>
+                <p>ATK: <span id="stat-atk">5</span></p>
+                <p>DEF: <span id="stat-def">1</span></p>
+                <p>LV: <span id="stat-lv">1</span></p>
+                <p>EXP: <span id="stat-exp">0</span> / <span id="stat-next-lv-exp">10</span></p>
+                <p>ポーション: <span id="stat-potions">0</span></p>
+            </div>
+            <div id="messages-container"><h3>メッセージ</h3><div id="messages"></div></div>
+        </div>
+    </div>
+    <div id="key-info">
+        <h4>操作キー</h4>
+        <p>移動/攻撃: <b>矢印キー</b> | ポーション使用: <b>D</b> | 待機: <b>.</b> | 階段: <b>Space</b> | 探索: <b>S</b></p>
+    </div>
+    <div id="ending-screen">
+        <h2>Congratulations!</h2>
+        <p>あなたは深淵のドラゴンを討伐し、ダンジョンを制覇しました。</p>
+        <button id="restart-button">もう一度遊ぶ</button>
+    </div>
+
+    <script>
+        /*
+        * The MIT License (MIT)
+        *
+        * Copyright (c) 2025 sin4auto
+        *
+        * Permission is hereby granted, free of charge, to any person obtaining a copy
+        * of this software and associated documentation files (the "Software"), to deal
+        * in the Software without restriction, including without limitation the rights
+        * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        * copies of the Software, and to permit persons to whom the Software is
+        * furnished to do so, subject to the following conditions:
+        *
+        * The above copyright notice and this permission notice shall be included in all
+        * copies or substantial portions of the Software.
+        *
+        * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        * SOFTWARE.
+        */
+
+        // --- 定数定義 ---
+
+        // ** ゲームの基本ルール **
+        const FINAL_FLOOR = 10;                                                 // この階に到達するとボスが登場します。
+
+        // ** マップの見た目と構造 **
+        const MAP_WIDTH = 50, MAP_HEIGHT = 30;                                  // ゲーム画面に表示されるマップの横幅と縦幅です。
+        const FOV_RADIUS = 8;                                                   // プレイヤーが一度に見渡せる範囲の広さです。
+        const MIN_ROOMS = 5, MAX_ADDITIONAL_ROOMS = 5;                          // フロアに作られる部屋の数の基本値と、ランダムで追加される数です。
+        const MIN_ROOM_SIZE = 4, MAX_ADDITIONAL_ROOM_SIZE = 6;                  // 部屋の大きさの基本値と、ランダムで追加される大きさです。
+        
+        // ** プレイヤーキャラクターの設定 **
+        const PLAYER_CHAR = '@';                                                // プレイヤーを表すマップ上の文字です。
+        const PLAYER_INITIAL_STATS = { hp: 30, maxHp: 30, atk: 5, def: 1, lv: 1, exp: 0, nextLvExp: 30, potions: 0 }; // ゲーム開始時のプレイヤーの能力値です。
+        const SEARCH_RADIUS = 1;                                                // 'S'キーで実行される探索の範囲です。
+        const STAIRS_HEAL_FACTOR_VS_MAX_HP = 4;                                 // 階段を降りた時、最大HPの (1 / この値) だけHPが回復します。
+
+        // ** レベルアップのルール **
+        const NEXT_LEVEL_EXP_FACTOR = 1.5;                                      // 次のレベルアップに必要な経験値が、現在の経験値の何倍になるかを決めます。
+        const LEVEL_UP_HP_BASE = 5, LEVEL_UP_HP_RANDOM = 5;                     // レベルアップ時のHP上昇量です (基本値 + 0からランダム値未満の数)。
+        const LEVEL_UP_ATK_BASE = 1, LEVEL_UP_ATK_RANDOM = 2;                   // レベルアップ時の攻撃力上昇量です。
+        const LEVEL_UP_DEF_CHANCE = 0.5;                                        // レベルアップ時に防御力が1上がる確率です (0.5 = 50%)。
+
+        // ** アイテムと罠の設定 **
+        const ITEM_SPAWN_BASE = 2, ITEM_SPAWN_RANDOM = 2;                       // フロアに配置されるアイテムの数です (基本値 + ランダム)。
+        const TRAP_SPAWN_BASE = 1, TRAP_SPAWN_RANDOM = 3;                       // フロアに配置される罠の数です (基本値 + ランダム)。
+        const TRAP_DAMAGE = 10;                                                 // 罠を踏んだ時に受けるダメージ量です。
+        const POTION_HEAL_BASE = 10;                                            // ポーションを使った時の基本的なHP回復量です。
+        const POTION_HEAL_FACTOR_VS_MAX_HP = 5;                                 // ポーション回復量の追加ボーナスです (最大HPの 1 / この値)。
+        const ITEM_SPAWN_WEIGHT = ['potion', 'potion', 'sword', 'shield'];      // アイテムが出現する時の種類の比率です。'potion'が多めに出ます。
+
+        // ** 敵キャラクターの設定 **
+        const ENEMY_SPAWN_BASE_PER_FLOOR = 2, ENEMY_SPAWN_RANDOM = 2;           // フロアに登場する敵の数です (基本値 + ランダム)。
+        const ENEMY_RANDOM_MOVE_CHANCE = 0.3;                                   // プレイヤーが見ていない場所で、敵がランダムに動く確率です。
+        const ENEMY_SCALING_HP_DIVISOR = 2;                                     // 深い階層に行くほど敵が強くなります。HPが1増えるのに必要な階層数です。
+        const ENEMY_SCALING_ATK_DIVISOR = 3;                                    // 敵の攻撃力が1増えるのに必要な階層数です。
+        const SLIME_SPLIT_CHANCE = 0.3, SLIME_SPLIT_HP_RATIO = 0.5;             // スライムを倒した時に分裂する確率と、分裂後のHPの割合です。
+        const ORC_ENRAGE_HP_THRESHOLD = 0.5, ORC_ENRAGE_ATK_MULTIPLIER = 1.5;   // オークのHPが半分以下になると怒り、攻撃力がこの倍率になります。
+
+        // --- データ定義 ---
+        const TILE = { WALL: '#', FLOOR: '.', STAIRS: '>', TRAP: '^', UNSEEN: ' ' }; // マップを構成する各タイルの見た目を定義します。
+
+        const ITEM_DATA = { // アイテムの種類と、それぞれの性能を定義します。
+            potion: { char: '!', name: "ポーション", type: 'potion' },
+            sword:  { char: '+', name: "剣",         type: 'weapon', atk: 2 },
+            shield: { char: ']', name: "盾",         type: 'armor',  def: 1 }
+        };
+
+        const ENEMY_DATA = { // 登場する敵キャラクターの種類と、それぞれの基本性能を定義します。
+            goblin: { char: 'g', name: "ゴブリン", hp: 10, atk: 3, def: 0, exp: 10, cssClass: 'tile-enemy' },
+            bat:    { char: 'b', name: "コウモリ", hp: 8,  atk: 4, def: 0, exp: 12, cssClass: 'tile-enemy-bat', canFly: true },
+            slime:  { char: 's', name: "スライム", hp: 15, atk: 2, def: 1, exp: 15, cssClass: 'tile-enemy', special: 'split' },
+            orc:    { char: 'o', name: "オーク",   hp: 25, atk: 6, def: 1, exp: 25, cssClass: 'tile-enemy-orc', special: 'enrage' },
+            troll:  { char: 'T', name: "トロール", hp: 40, atk: 8, def: 2, exp: 50, cssClass: 'tile-enemy-troll', regen: 2 },
+            dragon: { char: 'D', name: "ドラゴン", hp: 200, atk: 15, def: 5, exp: 1000, cssClass: 'tile-enemy-dragon', regen: 3 }
+        };
+        
+        // --- グローバル変数 ---
+        let gameMap, fovMap, trapMap;
+        let player, enemies, items;
+        let currentFloor;
+        let gameOver;
+        let animationTimeout;
+        let lastPlayerHp;
+
+        // --- DOM要素 ---
+        const messagesEl = document.getElementById('messages');
+        const gameMapEl = document.getElementById('gameMap');
+        const gameContainerEl = document.getElementById('game-container');
+        const keyInfoEl = document.getElementById('key-info');
+        const endingScreenEl = document.getElementById('ending-screen');
+        const restartButton = document.getElementById('restart-button');
+
+        // --- ゲームの初期化・メインループ ---
+        // ゲームを一番最初の状態に戻し、新しい冒険を始めます。
+        function initGame() {
+            hideEndingScreen();
+            gameOver = false;
+            currentFloor = 1;
+            player = { x: 0, y: 0, ...JSON.parse(JSON.stringify(PLAYER_INITIAL_STATS)) };
+            lastPlayerHp = player.hp;
+            messagesEl.innerHTML = '';
+            addMessage(`ようこそ！地下${FINAL_FLOOR}階のドラゴン討伐を目指せ！`, "msg-levelup");
+            
+            generateLevel();
+            updateAllUI();
+        }
+        
+        // プレイヤーが行動するたびに呼び出され、ゲームのターンを進行させます。
+        function gameTurn() {
+            if (gameOver) {
+                return;
+            }
+            handleEnemyTurns();
+            updateFov();
+            updateAllUI();
+        }
+
+        // --- 画面表示制御 ---
+        // ゲームクリア時に、お祝いメッセージの画面を表示します。
+        function showEndingScreen() {
+            gameContainerEl.style.opacity = '0';
+            keyInfoEl.style.opacity = '0';
+            endingScreenEl.classList.add('visible');
+        }
+
+        // お祝いメッセージの画面を隠し、通常のゲーム画面に戻します。
+        function hideEndingScreen() {
+            gameContainerEl.style.opacity = '1';
+            keyInfoEl.style.opacity = '1';
+            endingScreenEl.classList.remove('visible');
+        }
+
+        // --- レベル生成 ---
+        // 現在の階層に応じた新しいマップ（ダンジョン）を作ります。
+        function generateLevel() {
+            gameMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(TILE.WALL));
+            trapMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
+            fovMap = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(0));
+            enemies = [];
+            items = [];
+
+            if (currentFloor === FINAL_FLOOR) {
+                generateBossFloor();
+            } else {
+                generateNormalFloor();
+            }
+            updateFov();
+        }
+
+        // ボスが登場する、特別なデザインのフロアを作ります。
+        function generateBossFloor() {
+            const room = { x: 5, y: 5, w: MAP_WIDTH - 10, h: MAP_HEIGHT - 10 };
+            createRoom(room);
+            player.x = Math.floor(MAP_WIDTH / 2);
+            player.y = MAP_HEIGHT - 5;
+            enemies.push(createEnemy('dragon', Math.floor(MAP_WIDTH / 2), 8));
+            addMessage("ゴゴゴ...凄まじい気配がする！", "msg-damage");
+        }
+
+        // 部屋と通路で構成される、通常のダンジョンフロアを作ります。
+        function generateNormalFloor() {
+            const rooms = [];
+            const numRooms = Math.floor(Math.random() * MAX_ADDITIONAL_ROOMS) + MIN_ROOMS;
+            for (let i = 0; i < numRooms * 3 && rooms.length < numRooms; i++) {
+                const w = Math.floor(Math.random() * MAX_ADDITIONAL_ROOM_SIZE) + MIN_ROOM_SIZE;
+                const h = Math.floor(Math.random() * MAX_ADDITIONAL_ROOM_SIZE) + MIN_ROOM_SIZE;
+                const x = Math.floor(Math.random() * (MAP_WIDTH - w - 2)) + 1;
+                const y = Math.floor(Math.random() * (MAP_HEIGHT - h - 2)) + 1;
+                const newRoom = { x, y, w, h, centerX: x + Math.floor(w / 2), centerY: y + Math.floor(h / 2) };
+                
+                let overlaps = false;
+                for (const r of rooms) {
+                    if (newRoom.x < r.x + r.w && newRoom.x + newRoom.w > r.x && newRoom.y < r.y + r.h && newRoom.y + newRoom.h > r.y) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                if (!overlaps) {
+                    createRoom(newRoom);
+                    rooms.push(newRoom);
+                }
+            }
+            if (rooms.length === 0) {
+                const fallbackRoom = { x: 5, y: 5, w: MAP_WIDTH - 10, h: MAP_HEIGHT - 10, centerX: Math.floor(MAP_WIDTH / 2), centerY: Math.floor(MAP_HEIGHT / 2) };
+                createRoom(fallbackRoom);
+                rooms.push(fallbackRoom);
+            }
+            for (let i = 0; i < rooms.length - 1; i++) {
+                createHTunnel(rooms[i].centerX, rooms[i + 1].centerX, rooms[i].centerY);
+                createVTunnel(rooms[i].centerY, rooms[i + 1].centerY, rooms[i + 1].centerX);
+            }
+            player.x = rooms[0].centerX;
+            player.y = rooms[0].centerY;
+            gameMap[rooms[rooms.length - 1].centerY][rooms[rooms.length - 1].centerX] = TILE.STAIRS;
+            populateLevel(rooms);
+        }
+
+        // マップデータの中に、指定した大きさの「部屋」を作ります。
+        function createRoom(room) {
+            for (let y = room.y; y < room.y + room.h; y++) {
+                for (let x = room.x; x < room.x + room.w; x++) {
+                    if (x > 0 && y > 0 && x < MAP_WIDTH - 1 && y < MAP_HEIGHT - 1) {
+                        gameMap[y][x] = TILE.FLOOR;
+                    }
+                }
+            }
+        }
+
+        // マップデータの中に、2つの点を結ぶ「横方向の通路」を作ります。
+        function createHTunnel(x1, x2, y) {
+            for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+                if (x > 0 && y > 0 && x < MAP_WIDTH - 1 && y < MAP_HEIGHT - 1) {
+                    gameMap[y][x] = TILE.FLOOR;
+                }
+            }
+        }
+
+        // マップデータの中に、2つの点を結ぶ「縦方向の通路」を作ります。
+        function createVTunnel(y1, y2, x) {
+            for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+                if (x > 0 && y > 0 && x < MAP_WIDTH - 1 && y < MAP_HEIGHT - 1) {
+                    gameMap[y][x] = TILE.FLOOR;
+                }
+            }
+        }
+
+        // 指定された部屋の中で、キャラクターや物を置ける安全な場所を探します。
+        function getValidSpawnPos(room) {
+            let x, y, attempts = 0;
+            do {
+                x = room.x + Math.floor(Math.random() * room.w);
+                y = room.y + Math.floor(Math.random() * room.h);
+                if (++attempts > 50) {
+                    return null;
+                }
+            } while (
+                gameMap[y][x] !== TILE.FLOOR ||
+                (x === player.x && y === player.y) ||
+                items.some(i => i.x === x && i.y === y) ||
+                enemies.some(e => e.x === x && e.y === y)
+            );
+            return { x, y };
+        }
+
+        // 作られた部屋の中に、敵、アイテム、罠をランダムに配置します。
+        function populateLevel(rooms) {
+            const numEnemies = Math.floor(Math.random() * ENEMY_SPAWN_RANDOM) + currentFloor + ENEMY_SPAWN_BASE_PER_FLOOR;
+            for (let i = 0; i < numEnemies; i++) {
+                const room = rooms[Math.floor(Math.random() * rooms.length)];
+                const pos = getValidSpawnPos(room);
+                if (pos) {
+                    const enemyKey = getEnemyTypeForFloor(currentFloor);
+                    enemies.push(createEnemy(enemyKey, pos.x, pos.y));
+                }
+            }
+            const numItems = Math.floor(Math.random() * ITEM_SPAWN_RANDOM) + ITEM_SPAWN_BASE;
+            for (let i = 0; i < numItems; i++) {
+                const room = rooms[Math.floor(Math.random() * rooms.length)];
+                const pos = getValidSpawnPos(room);
+                if (pos) {
+                    const itemKey = ITEM_SPAWN_WEIGHT[Math.floor(Math.random() * ITEM_SPAWN_WEIGHT.length)];
+                    items.push({ x: pos.x, y: pos.y, ...ITEM_DATA[itemKey] });
+                }
+            }
+            const numTraps = Math.floor(Math.random() * TRAP_SPAWN_RANDOM) + TRAP_SPAWN_BASE;
+            for (let i = 0; i < numTraps; i++) {
+                const room = rooms[Math.floor(Math.random() * rooms.length)];
+                const pos = getValidSpawnPos(room);
+                if (pos) {
+                    trapMap[pos.y][pos.x] = { visible: false };
+                }
+            }
+        }
+
+        // 現在のフロアの深さに合わせて、登場する敵の種類を決定します。
+        function getEnemyTypeForFloor(floor) {
+            const chances = { goblin: 100, bat: 100, slime: floor * 10, orc: (floor - 2) * 10, troll: (floor - 4) * 10 };
+            const weightedList = [];
+            for (const [key, weight] of Object.entries(chances)) {
+                if (weight > 0) {
+                    for (let i = 0; i < weight; i++) {
+                        weightedList.push(key);
+                    }
+                }
+            }
+            if (weightedList.length === 0) {
+                return 'goblin';
+            }
+            return weightedList[Math.floor(Math.random() * weightedList.length)];
+        }
+
+        // 指定された種類の敵キャラクターを一体作り、その情報を返します。
+        function createEnemy(key, x, y) {
+            const baseStats = JSON.parse(JSON.stringify(ENEMY_DATA[key]));
+            const floorBonusHp = Math.floor(currentFloor / ENEMY_SCALING_HP_DIVISOR);
+            const floorBonusAtk = Math.floor(currentFloor / ENEMY_SCALING_ATK_DIVISOR);
+            return {
+                x, y, ...baseStats,
+                hp: baseStats.hp + floorBonusHp,
+                maxHp: baseStats.hp + floorBonusHp,
+                atk: baseStats.atk + floorBonusAtk,
+                isEnraged: false
+            };
+        }
+
+        // --- 描画とUI更新 ---
+        // ゲーム画面のすべての表示（ステータス、マップ）を最新の状態に更新します。
+        function updateAllUI() {
+            updateStatsUI();
+            render();
+        }
+
+        // プレイヤーの周りの「見える範囲」を計算し、マップのどこが見えるかを更新します。
+        function updateFov() {
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    if (fovMap[y][x] === 2) {
+                        fovMap[y][x] = 1;
+                    }
+                }
+            }
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 180) {
+                for (let r = 0; r <= FOV_RADIUS; r += 0.5) {
+                    const tx = Math.round(player.x + r * Math.cos(angle));
+                    const ty = Math.round(player.y + r * Math.sin(angle));
+                    if (tx < 0 || tx >= MAP_WIDTH || ty < 0 || ty >= MAP_HEIGHT) {
+                        break;
+                    }
+                    fovMap[ty][tx] = 2;
+                    if (gameMap[ty][tx] === TILE.WALL) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 計算されたマップ情報やキャラクターの位置を、実際のHTMLとして画面に描き出します。
+        function render() {
+            let displayString = "";
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const isVisible = fovMap[y][x] === 2;
+                    const isExplored = fovMap[y][x] >= 1;
+                    let char = TILE.UNSEEN;
+                    let className = 'tile-unseen';
+                    let extraClass = '';
+
+                    if (isVisible) {
+                        char = gameMap[y][x];
+                        if (char === TILE.WALL) className = 'tile-wall';
+                        else if (char === TILE.FLOOR) className = 'tile-floor';
+                        else if (char === TILE.STAIRS) className = 'tile-stairs';
+                        
+                        const trap = trapMap[y][x];
+                        if (trap && trap.visible) { char = TILE.TRAP; className = 'tile-trap'; }
+
+                        const item = items.find(i => i.x === x && i.y === y);
+                        if (item) { char = item.char; className = 'tile-item'; }
+                        
+                        const enemy = enemies.find(e => e.x === x && e.y === y);
+                        if (enemy) { char = enemy.char; className = enemy.cssClass; }
+                        
+                        if (player.x === x && player.y === y) { char = PLAYER_CHAR; className = 'tile-player'; }
+
+                        if(animationTimeout && animationTimeout.x === x && animationTimeout.y === y){
+                           extraClass = ` ${animationTimeout.className}`;
+                        }
+                    } else if (isExplored) {
+                        char = gameMap[y][x];
+                        className = 'tile-explored';
+                        const trap = trapMap[y][x];
+                        if (trap && trap.visible) { className += ' tile-trap'; char = TILE.TRAP; }
+                        if (char === TILE.STAIRS) className += ' tile-stairs';
+                    }
+                    displayString += `<span class="${className}${extraClass}">${char}</span>`;
+                }
+                displayString += "\n";
+            }
+            gameMapEl.innerHTML = displayString;
+            if (animationTimeout) {
+                setTimeout(() => { animationTimeout = null; render(); }, 300);
+            }
+        }
+
+        // 画面右側のステータスパネル（HP、攻撃力など）の表示を最新の情報に更新します。
+        function updateStatsUI() {
+            document.getElementById('stat-floor').textContent = currentFloor;
+            document.getElementById('stat-hp').textContent = player.hp;
+            document.getElementById('stat-maxhp').textContent = player.maxHp;
+            
+            const hpBar = document.getElementById('hp-bar');
+            hpBar.style.width = `${(player.hp / player.maxHp) * 100}%`;
+            if (player.hp < lastPlayerHp) {
+                hpBar.classList.add('damage-flash');
+                setTimeout(() => hpBar.classList.remove('damage-flash'), 400);
+            }
+            lastPlayerHp = player.hp;
+            
+            document.getElementById('stat-atk').textContent = player.atk;
+            document.getElementById('stat-def').textContent = player.def;
+            document.getElementById('stat-lv').textContent = player.lv;
+            document.getElementById('stat-exp').textContent = player.exp;
+            document.getElementById('stat-next-lv-exp').textContent = player.nextLvExp;
+            document.getElementById('stat-potions').textContent = player.potions;
+        }
+
+        // 画面右下のメッセージ欄に、新しい出来事を知らせるメッセージを追加します。
+        function addMessage(message, type = "") {
+            const p = document.createElement('p');
+            p.innerHTML = message;
+            if (type) {
+                p.classList.add(type);
+            }
+            messagesEl.appendChild(p);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // 指定した座標のタイルに、一瞬だけ光るなどのアニメーション効果を追加します。
+        function addAnimation(x, y, className) {
+            animationTimeout = {x, y, className};
+        }
+
+        // --- プレイヤーアクション ---
+        // プレイヤーがキーボードを押した時に、どのキーが押されたかを判断して適切な処理を呼び出します。
+        function handleInput(event) {
+            if (gameOver) {
+                return;
+            }
+            let dx = 0, dy = 0, actionTaken = false;
+            switch (event.key) {
+                case 'ArrowUp': dy = -1; break;
+                case 'ArrowDown': dy = 1; break;
+                case 'ArrowLeft': dx = -1; break;
+                case 'ArrowRight': dx = 1; break;
+                case '.':
+                    actionTaken = true;
+                    addMessage("待機した。");
+                    break;
+                case 'd': case 'D':
+                    actionTaken = usePotion();
+                    break;
+                case 's': case 'S':
+                    actionTaken = search();
+                    break;
+                case ' ':
+                    event.preventDefault();
+                    if (gameMap[player.y][player.x] === TILE.STAIRS) {
+                        descendStairs();
+                    }
+                    return;
+            }
+            if (dx !== 0 || dy !== 0) {
+                actionTaken = attemptMove(player.x + dx, player.y + dy);
+            }
+            if (actionTaken) {
+                gameTurn();
+            }
+        }
+
+        // プレイヤーが移動しようとした時の処理です。移動先に敵がいれば攻撃し、なければ移動します。
+        function attemptMove(targetX, targetY) {
+            if (targetX < 0 || targetX >= MAP_WIDTH || targetY < 0 || targetY >= MAP_HEIGHT || gameMap[targetY][targetX] === TILE.WALL) {
+                return false;
+            }
+            const enemyAtTarget = enemies.find(e => e.x === targetX && e.y === targetY);
+            if (enemyAtTarget) {
+                combat(player, enemyAtTarget);
+                return true;
+            }
+            player.x = targetX;
+            player.y = targetY;
+            
+            const itemIndex = items.findIndex(i => i.x === player.x && i.y === player.y);
+            if (itemIndex !== -1) {
+                pickupItem(items.splice(itemIndex, 1)[0]);
+            }
+            const trap = trapMap[player.y][player.x];
+            if (trap && !trap.visible) {
+                triggerTrap(player.x, player.y);
+            }
+            return true;
+        }
+
+        // プレイヤーがポーションを使う時の処理です。HPを回復します。
+        function usePotion() {
+            if (player.potions > 0) {
+                player.potions--;
+                const healFromMaxHp = Math.floor(player.maxHp / POTION_HEAL_FACTOR_VS_MAX_HP);
+                const healAmount = Math.min(POTION_HEAL_BASE + healFromMaxHp, player.maxHp - player.hp);
+                player.hp += healAmount;
+                addMessage(`ポーションを使い、HPが${healAmount}回復した！`, "msg-heal");
+                updateStatsUI();
+                return true;
+            }
+            addMessage("ポーションを持っていない。");
+            return false;
+        }
+
+        // プレイヤーが'S'キーで周囲を探索し、隠された罠を見つけます。
+        function search() {
+            let found = false;
+            for(let y = player.y - SEARCH_RADIUS; y <= player.y + SEARCH_RADIUS; y++) {
+                for(let x = player.x - SEARCH_RADIUS; x <= player.x + SEARCH_RADIUS; x++) {
+                    if (trapMap[y] && trapMap[y][x] && !trapMap[y][x].visible) {
+                        trapMap[y][x].visible = true;
+                        found = true;
+                    }
+                }
+            }
+            addMessage(found ? "罠を発見した！" : "何も見つからなかった。", found ? "msg-trap" : "");
+            return true;
+        }
+        
+        // プレイヤーが足元にあるアイテムを拾う時の処理です。
+        function pickupItem(item) {
+            addMessage(`${item.name}を拾った！`, "msg-pickup");
+            if (item.type === 'potion') {
+                player.potions++;
+            } else if (item.type === 'weapon') {
+                player.atk += item.atk;
+                addMessage(`ATKが${item.atk}上昇！`, "msg-levelup");
+            } else if (item.type === 'armor') {
+                player.def += item.def;
+                addMessage(`DEFが${item.def}上昇！`, "msg-levelup");
+            }
+        }
+        
+        // プレイヤーが見えていない罠を踏んでしまった時の処理です。ダメージを受けます。
+        function triggerTrap(x, y) {
+            addMessage("針の罠にかかった！痛い！", "msg-trap");
+            player.hp -= TRAP_DAMAGE;
+            trapMap[y][x].visible = true;
+            addAnimation(x, y, 'entity-flash');
+            if (checkDeath(player)) {
+                updateStatsUI();
+            }
+        }
+
+        // プレイヤーが階段を降りて、次のフロアに進む時の処理です。
+        function descendStairs() {
+            currentFloor++;
+            addMessage(`階段を降りて ${currentFloor}階へ...`, "msg-levelup");
+            const recovery = Math.floor(player.maxHp / STAIRS_HEAL_FACTOR_VS_MAX_HP);
+            if (recovery > 0) {
+                player.hp = Math.min(player.maxHp, player.hp + recovery);
+                addMessage(`HPが${recovery}回復した。`, "msg-heal");
+            }
+            generateLevel();
+            updateAllUI();
+        }
+
+        // --- 戦闘と敵のターン ---
+        // 攻撃側と防御側を指定して、戦闘のダメージ計算や結果の処理を行います。
+        function combat(attacker, defender) {
+            const damage = Math.max(0, attacker.atk - defender.def);
+            defender.hp -= damage;
+            addMessage(`${attacker.name || "プレイヤー"}は${defender.name || "プレイヤー"}に<b>${damage}</b>のダメージを与えた。`, "msg-damage");
+
+            if (checkDeath(defender)) {
+                if (defender !== player) {
+                    addMessage(`${defender.name}を倒した！ ${defender.exp}の経験値を得た。`, "msg-levelup");
+                    player.exp += defender.exp;
+                    addAnimation(defender.x, defender.y, 'entity-flash');
+
+                    if (defender.special === 'split' && Math.random() < SLIME_SPLIT_CHANCE) {
+                        splitSlime(defender);
+                    }
+                    enemies = enemies.filter(e => e !== defender);
+                    checkLevelUp();
+                }
+            } else if (defender.special === 'enrage' && !defender.isEnraged && defender.hp < defender.maxHp * ORC_ENRAGE_HP_THRESHOLD) {
+                defender.isEnraged = true;
+                defender.atk = Math.floor(defender.atk * ORC_ENRAGE_ATK_MULTIPLIER);
+                addMessage(`${defender.name}は激怒し、攻撃的になった！`, "msg-damage");
+            }
+        }
+        
+        // キャラクターのHPが0以下になったかを確認し、ゲームオーバーなどの処理を行います。
+        function checkDeath(entity) {
+            if (entity.hp <= 0) {
+                if (entity === player) {
+                    player.hp = 0;
+                    gameOver = true;
+                    addMessage("プレイヤーは倒れた... ゲームオーバー", "msg-game-over");
+                    addMessage("ページをリロードして再挑戦！");
+                } else if (entity.name === "ドラゴン") {
+                    gameOver = true;
+                    addMessage("ドラゴンを討伐した！おめでとう！", "msg-win");
+                    showEndingScreen();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // プレイヤーの経験値がたまったかを確認し、レベルアップ処理を行います。
+        function checkLevelUp() {
+            if (player.exp >= player.nextLvExp) {
+                player.lv++;
+                player.exp -= player.nextLvExp;
+                player.nextLvExp = Math.floor(player.nextLvExp * NEXT_LEVEL_EXP_FACTOR);
+                const hpGain = Math.floor(Math.random() * LEVEL_UP_HP_RANDOM) + LEVEL_UP_HP_BASE;
+                const atkGain = Math.floor(Math.random() * LEVEL_UP_ATK_RANDOM) + LEVEL_UP_ATK_BASE;
+                const defGain = (Math.random() < LEVEL_UP_DEF_CHANCE) ? 1 : 0;
+                player.maxHp += hpGain;
+                player.hp = player.maxHp;
+                player.atk += atkGain;
+                player.def += defGain;
+                addMessage(`レベルアップ！ LV ${player.lv}になった！`, "msg-levelup");
+                addMessage(`HP+${hpGain}, ATK+${atkGain}, DEF+${defGain}`);
+            }
+        }
+        
+        // スライムの特殊能力である「分裂」を処理します。
+        function splitSlime(originalSlime) {
+            addMessage("スライムが分裂した！", "msg-damage");
+            for(let dy = -1; dy <= 1; dy++) {
+                for(let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const nx = originalSlime.x + dx, ny = originalSlime.y + dy;
+                    if (gameMap[ny] && gameMap[ny][nx] === TILE.FLOOR && !enemies.some(e => e.x === nx && e.y === ny)) {
+                        const newSlime = createEnemy('slime', nx, ny);
+                        newSlime.hp = Math.floor(newSlime.maxHp * SLIME_SPLIT_HP_RATIO);
+                        enemies.push(newSlime);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // すべての敵キャラクターの行動（移動、攻撃など）を順番に処理します。
+        function handleEnemyTurns() {
+            enemies.forEach(enemy => {
+                if (enemy.hp <= 0) {
+                    return;
+                }
+                if (enemy.regen && enemy.hp < enemy.maxHp) {
+                    enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regen);
+                }
+
+                const isVisible = fovMap[enemy.y][enemy.x] === 2;
+                if (isVisible) {
+                    const dx = Math.sign(player.x - enemy.x);
+                    const dy = Math.sign(player.y - enemy.y);
+                    const nx = enemy.x + dx, ny = enemy.y + dy;
+                    if (nx === player.x && ny === player.y) {
+                        combat(enemy, player);
+                    } else {
+                        const isBlocked = enemies.some(e => e.x === nx && e.y === ny);
+                        const isWall = (gameMap[ny] && gameMap[ny][nx] !== TILE.FLOOR && gameMap[ny][nx] !== TILE.STAIRS);
+                        if (!isBlocked && (enemy.canFly || !isWall)) {
+                            enemy.x = nx;
+                            enemy.y = ny;
+                        }
+                    }
+                } else if (Math.random() < ENEMY_RANDOM_MOVE_CHANCE) {
+                    const rdx = Math.floor(Math.random() * 3) - 1, rdy = Math.floor(Math.random() * 3) - 1;
+                    const nx = enemy.x + rdx, ny = enemy.y + rdy;
+                    if (gameMap[ny] && gameMap[ny][nx] === TILE.FLOOR && !enemies.some(e => e.x === nx && e.y === ny)) {
+                        enemy.x = nx;
+                        enemy.y = ny;
+                    }
+                }
+            });
+        }
+        
+        // --- イベントリスナー ---
+        restartButton.addEventListener('click', initGame);
+        document.addEventListener('keydown', handleInput);
+        
+        // --- ゲーム開始 ---
+        initGame();
+    </script>
+</body>
+</html>

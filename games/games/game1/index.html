@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mini RPG</title>
+<style>
+body {
+  background:#111;
+  color:white;
+  font-family:sans-serif;
+  text-align:center;
+}
+#game {
+  width:420px;
+  margin:auto;
+  padding:20px;
+  border:2px solid #555;
+  background:#222;
+}
+button {
+  padding:10px;
+  margin:5px;
+}
+#log {
+  background:black;
+  height:140px;
+  overflow:auto;
+  margin-top:10px;
+  text-align:left;
+  padding:5px;
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Mini RPG</h1>
+
+<div id="game">
+  <div>Lv: <span id="lv">1</span></div>
+  <div>HP: <span id="hp">20</span></div>
+  <div>MP: <span id="mp">10</span></div>
+  <div>EXP: <span id="exp">0</span></div>
+
+  <hr>
+
+  <div>Enemy HP: <span id="ehp">0</span></div>
+
+  <button id="atk">Attack</button>
+  <button id="magic">Magic</button>
+  <button id="guard">Guard</button>
+
+  <div id="log"></div>
+</div>
+
+<script>
+const lvEl = document.getElementById("lv");
+const hpEl = document.getElementById("hp");
+const mpEl = document.getElementById("mp");
+const expEl = document.getElementById("exp");
+const ehpEl = document.getElementById("ehp");
+const logEl = document.getElementById("log");
+
+let player = {
+  lv:1,
+  hp:20,
+  maxHp:20,
+  mp:10,
+  maxMp:10,
+  atk:5,
+  exp:0
+};
+
+let enemy = {};
+
+function log(t){
+  logEl.innerHTML += t + "<br>";
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function update(){
+  lvEl.textContent = player.lv;
+  hpEl.textContent = player.hp;
+  mpEl.textContent = player.mp;
+  expEl.textContent = player.exp;
+  ehpEl.textContent = enemy.hp;
+}
+
+function newEnemy(){
+  enemy = {
+    hp:12 + player.lv * 6,
+    atk:3 + player.lv
+  };
+  log("Enemy appeared!");
+  update();
+}
+
+function levelUp(){
+  player.lv++;
+  player.maxHp += 5;
+  player.maxMp += 3;
+  player.atk += 1;
+  player.hp = player.maxHp;
+  player.mp = player.maxMp;
+  player.exp = 0;
+  log("LEVEL UP!");
+}
+
+function gainExp(amount){
+  player.exp += amount;
+  if(player.exp >= player.lv * 10){
+    levelUp();
+  }
+}
+
+function enemyTurn(reduce=0){
+  let dmg = Math.max(0, enemy.atk - reduce);
+  player.hp -= dmg;
+  log("Enemy attacks: " + dmg);
+  if(player.hp <= 0){
+    alert("Game Over");
+    location.reload();
+  }
+  update();
+}
+
+document.getElementById("atk").onclick = () => {
+  let dmg = player.atk + Math.floor(Math.random()*3);
+  enemy.hp -= dmg;
+  log("You attack: " + dmg);
+  afterPlayerTurn();
+};
+
+document.getElementById("magic").onclick = () => {
+  if(player.mp < 3){
+    log("Not enough MP!");
+    return;
+  }
+  player.mp -= 3;
+  let dmg = player.atk * 2 + Math.floor(Math.random()*5);
+  enemy.hp -= dmg;
+  log("Magic! " + dmg + " damage");
+  afterPlayerTurn();
+};
+
+document.getElementById("guard").onclick = () => {
+  log("You guard");
+  enemyTurn(2);
+};
+
+function afterPlayerTurn(){
+  if(enemy.hp <= 0){
+    log("Enemy defeated!");
+    gainExp(5);
+    newEnemy();
+  } else {
+    enemyTurn();
+  }
+}
+
+newEnemy();
+</script>
+
+</body>
+</html>
